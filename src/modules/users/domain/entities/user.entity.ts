@@ -1,3 +1,13 @@
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+
+@Entity('users')
 export class User {
-    constructor(public id: string, public email: string, public name: string) {}
+  @PrimaryGeneratedColumn('uuid')
+  id: string;
+
+  @Column()
+  email: string;
+
+  @Column()
+  name: string;
 }

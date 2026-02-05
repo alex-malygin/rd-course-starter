@@ -17,9 +17,12 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-     "paths": {
-      "src/*": ["./*"],
-      "@config/*": ["./config/*"],
+    "paths": {
+      "src/*": ["src/*"],
+      "@config/*": ["src/config/*"],
+      "@users/*": ["src/modules/users/*"],
+      "@products/*": ["src/modules/products/*"],
+      "@orders/*": ["src/modules/orders/*"]
     }
   }
 }
