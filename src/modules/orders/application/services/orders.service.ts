@@ -95,7 +95,21 @@ export class OrdersService {
         throw error;
       }
 
-      throw new InternalServerErrorException('An unexpected error occurred during order creation.');
+      if (
+        error.code === '23505' &&
+        (error.detail?.includes('idempotency_key') ||
+          error.constraint?.includes('idempotency_key'))
+      ) {
+        const existingOrder =
+          await this.orderRepository.findByKey(idempotencyKey);
+        if (existingOrder) {
+          return existingOrder;
+        }
+      }
+
+      throw new InternalServerErrorException(
+        'An unexpected error occurred during order creation.',
+      );
     } finally {
       await queryRunner.release();
     }
