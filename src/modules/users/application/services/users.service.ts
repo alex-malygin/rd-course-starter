@@ -26,7 +26,8 @@ export class UsersService {
       throw new ConflictException('Uset already exist');
     }
 
-    const newUser = new User(Math.random().toString(), email, name);
+    const newUser = new User();
+    Object.assign(newUser, user);
     return this.userRepository.save(newUser);
   }
 
