@@ -31,6 +31,21 @@ class EnvironmentVariables {
 
   @IsNotEmpty()
   POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD;
+
+  @IsNotEmpty()
+  AWS_REGION = process.env.AWS_REGION;
+
+  @IsNotEmpty()
+  AWS_ACCESS_KEY_ID = process.env.AWS_ACCESS_KEY_ID;
+
+  @IsNotEmpty()
+  AWS_SECRET_ACCESS_KEY = process.env.AWS_SECRET_ACCESS_KEY;
+
+  @IsNotEmpty()
+  AWS_S3_BUCKET = process.env.AWS_S3_BUCKET;
+
+  @IsOptional()
+  CLOUDFRONT_BASE_URL = process.env.CLOUDFRONT_BASE_URL;
 }
 
 export const envs = new EnvironmentVariables();
@@ -48,7 +63,15 @@ export const databaseConfig = registerAs('database', () => ({
   database: envs.POSTGRES_DB,
 }));
 
-export const envNamespaces = [appConfig, databaseConfig];
+export const awsConfig = registerAs('aws', () => ({
+  region: envs.AWS_REGION,
+  accessKeyId: envs.AWS_ACCESS_KEY_ID,
+  secretAccessKey: envs.AWS_SECRET_ACCESS_KEY,
+  bucket: envs.AWS_S3_BUCKET,
+  cloudfrontBaseUrl: envs.CLOUDFRONT_BASE_URL,
+}));
+
+export const envNamespaces = [appConfig, databaseConfig, awsConfig];
 
 export function validateEnv(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {
