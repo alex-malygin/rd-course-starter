@@ -1,0 +1,85 @@
+services:
+  api:
+    build:
+      context: .
+      target: prod-distroless
+    container_name: rd-api
+    restart: always
+    ports:
+      - "8080:3000"
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - public
+      - internal
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: rd-postgres
+    restart: always
+    env_file:
+      - .env
+    networks:
+      - internal
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  migrate:
+    build:
+      context: .
+      target: build
+    container_name: rd-migrate
+    env_file:
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: pnpm run typeorm:migration:run
+    networks:
+      - internal
+
+  seed:
+    image: postgres:17-alpine
+    container_name: rd-seed
+    env_file:
+      - .env
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./seed.sql:/seed.sql
+    command: psql -h postgres -U ${POSTGRES_USER} -d ${POSTGRES_DB} -f /seed.sql
+    networks:
+      - internal
+
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: rd-pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL:-admin@admin.com}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD:-admin}
+    ports:
+      - "5050:80"
+    networks:
+      - public
+      - internal
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+networks:
+  public:
+  internal:
+    internal: true
+
+volumes:
+  pgdata:
