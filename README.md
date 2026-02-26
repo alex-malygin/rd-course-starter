@@ -82,6 +82,67 @@ curl http://localhost:3000/products/b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12
 
 ---
 
+## ☁️ AWS S3 Integration Testing (Runtime Flow)
+
+Для перевірки повного циклу завантаження аватарки (presign -> upload -> complete) виконайте наступні кроки.
+
+### Крок 1: Отримання Presigned URL
+Відправте запит на створення URL для завантаження. Використовуйте `x-user-id` для імітації авторизації.
+```bash
+# Збережіть результат у файл для зручності
+curl -X POST http://localhost:3000/files/presign \
+-H "Content-Type: application/json" \
+-H "x-user-id: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
+-d '{
+  "fileName": "avatar.png",
+  "contentType": "image/png"
+}' > presign_response.json
+
+# Подивіться на fileId та uploadUrl
+cat presign_response.json | jq .
+```
+
+### Крок 2: Direct Upload до S3 (або LocalStack)
+Використовуйте отриманий `uploadUrl` для завантаження файлу. 
+**Важливо:** Метод має бути `PUT`, а `Content-Type` має збігатися з тим, що вказали в Кроці 1.
+```bash
+# Створіть тестовий файл
+echo "fake-image-binary-data" > test_avatar.png
+
+# Отримайте URL з файлу (якщо є jq)
+UPLOAD_URL=$(cat presign_response.json | jq -r .uploadUrl)
+
+# Завантажте файл
+curl -X PUT -H "Content-Type: image/png" --upload-file test_avatar.png "$UPLOAD_URL"
+```
+
+### Крок 3: Підтвердження завантаження та оновлення аватара
+Після успішного `PUT` запиту (код 200), повідомте бекенд, що файл готовий.
+```bash
+FILE_ID=$(cat presign_response.json | jq -r .fileId)
+
+curl -X POST http://localhost:3000/files/complete-avatar \
+-H "Content-Type: application/json" \
+-H "x-user-id: a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11" \
+-d "{
+  \"fileId\": \"$FILE_ID\"
+}"
+```
+
+### Перевірка Ownership Check (403 Forbidden)
+Спробуйте виконати Step 3 від імені іншого користувача:
+```bash
+curl -X POST http://localhost:3000/files/complete-avatar \
+-H "Content-Type: application/json" \
+-H "x-user-id: DIFFERENT_USER_ID" \
+-d "{
+  \"fileId\": \"$FILE_ID\"
+}"
+```
+*Ви повинні отримати 403 Forbidden з повідомленням про помилку ownership check.*
+
+---
+
 ## 📂 Структура проєкту
 
 Проєкт організовано за модульним підходом NestJS, що інтегрований у шари чистої архітектури:

@@ -68,15 +68,23 @@ export class FilesService {
     });
 
     if (!fileRecord) {
-      throw new NotFoundException('File record not found');
+      throw new NotFoundException(`File record ${fileId} not found`);
     }
 
     if (fileRecord.ownerId !== userId) {
-      throw new ForbiddenException('You do not own this file');
+      throw new ForbiddenException(
+        `Ownership check failed: file ${fileId} belongs to ${fileRecord.ownerId}, but requested by ${userId}`,
+      );
+    }
+
+    if (fileRecord.status === FileStatus.READY) {
+      return fileRecord;
     }
 
     fileRecord.status = FileStatus.READY;
-    return this.fileRepository.save(fileRecord);
+    const saved = await this.fileRepository.save(fileRecord);
+    console.log(`File ${fileId} marked as READY for user ${userId}`);
+    return saved;
   }
 
   async completeAvatar(userId: string, fileId: string): Promise<FileRecord> {

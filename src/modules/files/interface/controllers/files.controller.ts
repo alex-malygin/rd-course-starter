@@ -12,22 +12,28 @@ export class FilesController {
     @Body() dto: CreatePresignedUrlDto,
     @Request() req: any,
   ) {
-    //Mock user ID
-    const userId = req.headers['x-user-id'] || 'user-uuid';
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new Error('x-user-id header is required for testing');
+    }
     return this.filesService.createPresignedUrl(userId, dto);
   }
 
   @Post('complete')
   async completeUpload(@Body() dto: CompleteUploadDto, @Request() req: any) {
-    //Mock user ID
-    const userId = req.headers['x-user-id'] || 'user-uuid';
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new Error('x-user-id header is required for testing');
+    }
     return this.filesService.completeUpload(userId, dto.fileId);
   }
 
   @Post('complete-avatar')
   async completeAvatar(@Body() dto: CompleteUploadDto, @Request() req: any) {
-    //Mock user ID
-    const userId = req.headers['x-user-id'] || 'user-uuid';
+    const userId = req.headers['x-user-id'];
+    if (!userId) {
+      throw new Error('x-user-id header is required for testing');
+    }
     return this.filesService.completeAvatar(userId, dto.fileId);
   }
 }
