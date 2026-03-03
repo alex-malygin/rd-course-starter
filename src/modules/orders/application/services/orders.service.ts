@@ -14,6 +14,8 @@ import { DataSource } from 'typeorm';
 import { CreateOrderDto } from '../../interface/dto/create-order.dto';
 import { Order, OrderStatus } from '../../domain/entities/order.entity';
 import { OrderItem } from '../../domain/entities/order-item.entity';
+import { RabbitMQProducerService } from '../../../rabbitmq/rabbitmq-producer.service';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class OrdersService {
@@ -21,6 +23,7 @@ export class OrdersService {
     @Inject(ORDER_REPOSITORY)
     private readonly orderRepository: IOrderRepository,
     private readonly dataSource: DataSource,
+    private readonly rabbitMQProducer: RabbitMQProducerService,
   ) {}
 
   async createOrder(createOrderDto: CreateOrderDto): Promise<Order> {
@@ -83,6 +86,9 @@ export class OrdersService {
       newOrder.totalAmount = totalAmount;
       const createdOrder = await queryRunner.manager.save(newOrder);
       await queryRunner.commitTransaction();
+
+      const messageId = uuidv4();
+      await this.rabbitMQProducer.publishOrder(createdOrder.id, messageId);
 
       return createdOrder;
     } catch (error) {

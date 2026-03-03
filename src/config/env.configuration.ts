@@ -31,6 +31,18 @@ class EnvironmentVariables {
 
   @IsNotEmpty()
   POSTGRES_PASSWORD = process.env.POSTGRES_PASSWORD;
+
+  @IsNotEmpty()
+  RABBITMQ_USER = process.env.RABBITMQ_USER;
+
+  @IsNotEmpty()
+  RABBITMQ_PASS = process.env.RABBITMQ_PASS;
+
+  @IsNotEmpty()
+  RABBITMQ_HOST = process.env.RABBITMQ_HOST;
+
+  @IsNotEmpty()
+  RABBITMQ_PORT = Number(process.env.RABBITMQ_PORT);
 }
 
 export const envs = new EnvironmentVariables();
@@ -48,7 +60,14 @@ export const databaseConfig = registerAs('database', () => ({
   database: envs.POSTGRES_DB,
 }));
 
-export const envNamespaces = [appConfig, databaseConfig];
+export const rabbitmqConfig = registerAs('rabbitmq', () => ({
+  user: envs.RABBITMQ_USER,
+  pass: envs.RABBITMQ_PASS,
+  host: envs.RABBITMQ_HOST,
+  port: envs.RABBITMQ_PORT,
+}));
+
+export const envNamespaces = [appConfig, databaseConfig, rabbitmqConfig];
 
 export function validateEnv(config: Record<string, unknown>) {
   const validatedConfig = plainToInstance(EnvironmentVariables, config, {

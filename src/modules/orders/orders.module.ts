@@ -8,6 +8,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { Order } from './domain/entities/order.entity';
 import { OrderItem } from './domain/entities/order-item.entity';
 import { User } from '../users/domain/entities/user.entity';
+import { RabbitMQModule } from '../rabbitmq/rabbitmq.module';
 
 const OrdersRepositoryProvider = {
   provide: ORDER_REPOSITORY,
@@ -15,7 +16,11 @@ const OrdersRepositoryProvider = {
 };
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, User]), ProductsModule],
+  imports: [
+    TypeOrmModule.forFeature([Order, OrderItem, User]),
+    ProductsModule,
+    RabbitMQModule,
+  ],
   controllers: [OrdersController],
   providers: [OrdersService, OrdersRepositoryProvider],
   exports: [OrdersService],

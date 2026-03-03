@@ -15,3 +15,16 @@ services:
   postgres:
     ports:
       - '5432:5432'
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: rd-rabbitmq
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS:-guest}
+    networks:
+      - internal
+      - public

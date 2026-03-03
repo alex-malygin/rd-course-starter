@@ -40,7 +40,12 @@ docker compose run --rm migrate
 docker compose run --rm seed
 ```
 
-### 4. Візуалізація бази даних (pgAdmin)
+### 4. Візуалізація RabbitMQ (Management UI)
+Панель керування чергами доступна за адресою:
+- [http://localhost:15672](http://localhost:15672)
+- **Логін/Пароль**: `guest` / `guest` (за замовчуванням)
+
+### 5. Візуалізація бази даних (pgAdmin)
 Для зручного перегляду бази даних через браузер:
 1. Відкрийте [http://localhost:5050](http://localhost:5050).
 2. Увійдіть за допомогою:
@@ -64,7 +69,7 @@ curl http://localhost:8080/products/b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12
 ```bash
 curl -X POST http://localhost:8080/orders \
   -H "Content-Type: application/json" \
-  -H "x-idempotency-key: 550e8400-e29b-41d4-a716-446655440000" \
+  -H "x-idempotency-key: $(uuidgen)" \
   -d '{
     "userId": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
     "items": [
@@ -75,8 +80,15 @@ curl -X POST http://localhost:8080/orders \
     ]
   }'
 ```
-- **Успішно**: 201 Created.
-- **Повторний запит (Ідемпотентність)**: 200 OK (повертає те саме замовлення без повторного списання stock).
+- **Успішно**: 201 Created. Відповідь повертається миттєво, обробка йде в RabbitMQ.
+- **Повторний запит**: 200 OK (повертає те саме замовлення без повторного списання stock).
+
+### Тестування RabbitMQ Workflow
+
+1. **Happy Path**: Створіть замовлення. У логах API побачите `Publishing order...`, у логах воркера — `[Worker] Successfully processed order...`. Статус замовлення в БД зміниться на `COMPLETED`.
+2. **Retry**: Спровокуйте помилку (наприклад, зупинивши БД або змінивши код воркера). Ви побачите в логах повідомлення про повторні спроби: `[Worker] Retrying order ..., attempt X`.
+3. **DLQ**: Після 3 невдалих спроб повідомлення потрапить у чергу `orders.dlq`. Перевірте це в RabbitMQ UI.
+4. **Ідемпотентність**: Повторно надішліть те саме повідомлення через RabbitMQ UI. Воркер зафіксує дублікат: `[Worker] Message ... already processed. Skipping.`.
 
 ## Докази оптимізації та безпеки
 
@@ -101,6 +113,8 @@ docker run --rm rd-api:prod id
 ```
 
 ## Особливості архітектури
+- **RabbitMQ Reliability**: Використання Manual Ack, Persistent messages, Retry mechanism (republish) та DLQ.
+- **Idempotency**: Message-level idempotency за допомогою таблиці `processed_messages`.
 - **Multi-stage Build**: Відокремлено збірку (`build`), встановлення залежностей (`deps`) та runtime.
 - **Security**: Postgres знаходиться у приватній мережі `internal` і не доступний ззовні.
 - **Distroless**: Використання `gcr.io/distroless/nodejs22-debian12` забезпечує мінімальну поверхню атаки.
@@ -115,13 +129,10 @@ src/
 ├── common/              # Спільні утиліти, декоратори, фільтри
 ├── modules/             # Функціональні модулі
 │   ├── users/           # Приклад модуля
-│   │   ├── domain/
-│   │   ├── application/
-│   │   ├── infrastructure/
-│   │   ├── interface/
-│   │   └── users.module.ts
-│   ├── orders/          # ...
-│   └── products/        # ...
+│   ├── orders/          # Замовлення + RabbitMQ Producer
+│   ├── products/        # Каталог товарів
+│   ├── rabbitmq/        # Інфраструктура RabbitMQ
+│   └── worker/          # Consumer (Background Processing)
 ├── app.module.ts        # Кореневий модуль
 └── main.ts              # Точка входу
 ```
