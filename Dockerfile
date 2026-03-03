@@ -1,67 +1,52 @@
-##################
-# BUILD BASE IMAGE
-##################
-
-FROM node:20-alpine AS base
-
-# Install and use pnpm
+# --- Base image with pnpm ---
+FROM node:22-alpine AS base
 RUN npm install -g pnpm
 
-#############################
-# BUILD FOR LOCAL DEVELOPMENT
-#############################
-
-FROM base As development
+# --- Dependencies stage ---
+FROM base AS deps
 WORKDIR /app
-RUN chown -R node:node /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 
-COPY --chown=node:node package*.json pnpm-lock.yaml ./
-
-RUN pnpm install
-
-COPY --chown=node:node . .
-
-USER node
-
-#####################
-# BUILD BUILDER IMAGE
-#####################
-
-FROM base AS builder
+# --- Build stage ---
+FROM base AS build
 WORKDIR /app
-
-COPY --chown=node:node package*.json pnpm-lock.yaml ./
-COPY --chown=node:node --from=development /app/node_modules ./node_modules
-COPY --chown=node:node --from=development /app/src ./src
-COPY --chown=node:node --from=development /app/tsconfig.json ./tsconfig.json
-COPY --chown=node:node --from=development /app/tsconfig.build.json ./tsconfig.build.json
-COPY --chown=node:node --from=development /app/nest-cli.json ./nest-cli.json
-
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 RUN pnpm build
 
-# Debug: List the contents of the dist directory after build
-RUN echo "--- Contents of /app/dist in builder stage ---" && ls -R /app/dist
-
-# Removes unnecessary packages adn re-install only production dependencies
-ENV NODE_ENV production
-RUN rm -rf node_modules && pnpm install --prod --frozen-lockfile
-
-USER node
-
-######################
-# BUILD FOR PRODUCTION
-######################
-
-FROM node:20-alpine AS production
+# --- Production dependencies stage ---
+FROM base AS prod-deps
 WORKDIR /app
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --prod --frozen-lockfile
 
-# Copy the bundled code from the build stage to the production image
-COPY --chown=node:node --from=builder /app/node_modules ./node_modules
-COPY --chown=node:node --from=builder /app/dist ./dist
-COPY --chown=node:node --from=builder /app/package.json ./
-
-RUN echo "--- Contents of /app/dist in production stage ---" && ls -R /app/dist
-
+# --- Development stage (hot reload) ---
+FROM base AS dev
+WORKDIR /app
+# We don't COPY here as we use bind mount in compose.dev.yml
+# But we need node_modules
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
 USER node
+CMD ["pnpm", "run", "start:dev"]
 
-CMD [ "node", "dist/main.js" ]
+# --- Production stage (minimal alpine) ---
+FROM node:22-alpine AS prod
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
+COPY package.json ./
+USER node
+CMD ["node", "dist/main.js"]
+
+# --- Production stage (distroless) ---
+FROM gcr.io/distroless/nodejs22-debian12 AS prod-distroless
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=prod-deps /app/node_modules ./node_modules
+COPY --from=build /app/dist/src ./src
+COPY package.json ./
+USER nonroot
+CMD ["src/main.js"]
